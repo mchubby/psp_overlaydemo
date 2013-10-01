@@ -45,21 +45,22 @@ void init_modules() {
 
 ////////////////////////////////////////////////////////////////////////////////
 int sceDisplaySetFrameBuf_Patched(void *topaddr, int bufferwidth, int pixelformat, int sync) {
-    if (!plugin_enabled) return;
+    if (plugin_enabled) {
 
-    /* set unbuffered framebuffer access */
-    u32 ptr = (u32)topaddr;
-    ptr |= ((ptr & 0x80000000) ? 0xA0000000 : 0x40000000);
+			/* set unbuffered framebuffer access */
+			u32 ptr = (u32)topaddr;
+			ptr |= ((ptr & 0x80000000) ? 0xA0000000 : 0x40000000);
 
-    // avoid flickering most of the time with uncached buffer access
-    libmInitBuffers_ForHook(LIBM_DRAW_BLEND, (void*)ptr, bufferwidth, pixelformat, sync, &dinfo);
+			// avoid flickering most of the time with uncached buffer access
+			libmInitBuffers_ForHook(LIBM_DRAW_BLEND, (void*)ptr, bufferwidth, pixelformat, sync, &dinfo);
 
-    libmFrame(5,55, 95,155, 0xff00FF00, &dinfo);
-    libmPrintXY(0,256,0xff00FFFF,0x5cFFFFFF, "Overlay demo text", &dinfo);
-    libmFillRect(10,50, 100,150, 0xffFF0000, &dinfo);
+			libmFrame(5,55, 95,155, 0xff00FF00, &dinfo);
+			libmPrintXY(0,256,0xff00FFFF,0x5cFFFFFF, "Overlay demo text", &dinfo);
+			libmFillRect(10,50, 100,150, 0xffFF0000, &dinfo);
 #if 0
-    sync = PSP_DISPLAY_SETBUF_IMMEDIATE;
+			sync = PSP_DISPLAY_SETBUF_IMMEDIATE;
 #endif
+		}
     return sceDisplaySetFrameBuf_Org ? sceDisplaySetFrameBuf_Org(topaddr, bufferwidth, pixelformat, sync) : 0;
 }
 
