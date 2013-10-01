@@ -16,6 +16,8 @@ int (*sceDisplaySetFrameBuf_Org)(void *, int, int, int);
 libm_draw_info dinfo;
 libm_vram_info vinfo;
 
+int plugin_enabled;
+
 SceUID LoadStartModule(char *module) {
 	SceUID mod = sceKernelLoadModule(module, 0, NULL);
 	if (mod < 0)
@@ -43,6 +45,7 @@ void init_modules() {
 
 ////////////////////////////////////////////////////////////////////////////////
 int sceDisplaySetFrameBuf_Patched(void *topaddr, int bufferwidth, int pixelformat, int sync) {
+    if (!plugin_enabled) return;
 
     /* set unbuffered framebuffer access */
     u32 ptr = (u32)topaddr;
@@ -54,13 +57,14 @@ int sceDisplaySetFrameBuf_Patched(void *topaddr, int bufferwidth, int pixelforma
     libmFrame(5,55, 95,155, 0xff00FF00, &dinfo);
     libmPrintXY(0,256,0xff00FFFF,0x5cFFFFFF, "Overlay demo text", &dinfo);
     libmFillRect(10,50, 100,150, 0xffFF0000, &dinfo);
-#if 1
+#if 0
     sync = PSP_DISPLAY_SETBUF_IMMEDIATE;
 #endif
     return sceDisplaySetFrameBuf_Org ? sceDisplaySetFrameBuf_Org(topaddr, bufferwidth, pixelformat, sync) : 0;
 }
 
 int thread_start(SceSize args, void *argp) {
+    plugin_enabled = 0;
     init_modules();
 
     // load 0x00-0x7F + SJIS range
@@ -75,7 +79,15 @@ int thread_start(SceSize args, void *argp) {
 
     sceDisplaySetFrameBuf_Org = libmHookDisplayHandler(sceDisplaySetFrameBuf_Patched);
 
-    sceKernelSleepThread();
+    while (	1 ) {
+        SceCtrlData pad;
+        sceCtrlPeekBufferPositive(&pad, 1);
+        if ((pad.Buttons & PSP_CTRL_NOTE) != 0) {
+            plugin_enabled = 1 - plugin_enabled;
+        }
+        sceKernelDelayThread(10000);
+    }
+
     return 0;
 }
 
