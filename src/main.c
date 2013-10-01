@@ -7,7 +7,7 @@
 #define PLUGIN_MAJ 0
 #define PLUGIN_MIN 2
 PSP_MODULE_INFO(PLUGIN_NAME, PSP_MODULE_KERNEL, PLUGIN_MAJ, PLUGIN_MIN);
-PSP_HEAP_SIZE_KB(0);
+PSP_HEAP_SIZE_KB(-1);
 
 static char ms_libmenu_path[] = { "ms0:/seplugins/lib/cmlibmenu.prx"};
 static char ef_libmenu_path[] = { "ef0:/seplugins/lib/cmlibmenu.prx"};
@@ -44,19 +44,19 @@ void init_modules() {
 ////////////////////////////////////////////////////////////////////////////////
 int sceDisplaySetFrameBuf_Patched(void *topaddr, int bufferwidth, int pixelformat, int sync) {
 
-    if(pixelformat != dinfo.vinfo->format) {
-        libmInitBuffers_ForHook(LIBM_DRAW_BLEND, topaddr, bufferwidth, pixelformat, sync, &dinfo);
-    }
-    // avoid flickering most of the time
-    libmInitBuffers(LIBM_DRAW_BLEND, sync, &dinfo);
-    dinfo.vinfo->buffer = topaddr;
+    /* set unbuffered framebuffer access */
+    u32 ptr = (u32)topaddr;
+    ptr |= ((ptr & 0x80000000) ? 0xA0000000 : 0x40000000);
+
+    // avoid flickering most of the time with uncached buffer access
+    libmInitBuffers_ForHook(LIBM_DRAW_BLEND, (void*)ptr, bufferwidth, pixelformat, sync, &dinfo);
 
     libmFrame(5,55, 95,155, 0xff00FF00, &dinfo);
-    if(pixelformat == PSP_DISPLAY_PIXEL_FORMAT_8888) {
-        libmPrintXY(0,256,0xff00FFFF,0x5cFFFFFF, "Overlay demo text", &dinfo);
-        libmFillRect(10,50, 100,150, 0xffFF0000, &dinfo);
-    }
-
+    libmPrintXY(0,256,0xff00FFFF,0x5cFFFFFF, "Overlay demo text", &dinfo);
+    libmFillRect(10,50, 100,150, 0xffFF0000, &dinfo);
+#if 1
+    sync = PSP_DISPLAY_SETBUF_IMMEDIATE;
+#endif
     return sceDisplaySetFrameBuf_Org ? sceDisplaySetFrameBuf_Org(topaddr, bufferwidth, pixelformat, sync) : 0;
 }
 
@@ -70,17 +70,12 @@ int thread_start(SceSize args, void *argp) {
     memset(&dinfo, 0, sizeof(dinfo));    memset(&vinfo, 0, sizeof(vinfo));
     dinfo.vinfo = &vinfo;
 
-    while(!libmDebugScreenInit(&dinfo)) {
-        sceKernelDelayThread(100);
-    }
+    // This needs to be called at least once
+    libmInitBuffers(0x00000000, 0, &dinfo);
 
     sceDisplaySetFrameBuf_Org = libmHookDisplayHandler(sceDisplaySetFrameBuf_Patched);
 
-    while(1) {
-        //sceDisplayWaitVblankStart();
-        sceKernelDelayThread(1000);
-    }
-
+    sceKernelSleepThread();
     return 0;
 }
 
