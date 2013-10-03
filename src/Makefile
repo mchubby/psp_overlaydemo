@@ -1,6 +1,6 @@
 TARGET = overlaydemo
-OBJS = main.o exports.o
-LIBS = 
+OBJS = main.o imports.o exports.o
+LIBS = -lpspumd
 LIBS += libcmlibMenu.a
 WARN_FLAGS=-Wall
 CFLAGS = -Os -G0 -fno-strict-aliasing $(WARN_FLAGS)
