@@ -70,16 +70,15 @@ int sceDisplaySetFrameBuf_Patched(void *topaddr, int bufferwidth, int pixelforma
 
 
 static void read_gameid_from_umd() {
-    int fd;
     if (sceUmdGetDriveStat() != PSP_UMD_READY) {
-        if (sceUmdWaitDriveStat(PSP_UMD_PRESENT) < 0
+        if (sceUmdWaitDriveStatWithTimer(PSP_UMD_PRESENT, 500000) < 0
                 || sceUmdActivate(1, "disc0:") < 0
                 || sceUmdWaitDriveStat(PSP_UMD_READY) < 0) {
             gameid[0] = 0;
             return;
         }
     }
-    fd = sceIoOpen("disc0:/UMD_DATA.BIN", PSP_O_RDONLY, 0777);
+    SceUID fd = sceIoOpen("disc0:/UMD_DATA.BIN", PSP_O_RDONLY, 0777);
     if (fd >= 0) {
         sceIoRead(fd, gameid, 10);
         sceIoClose(fd);
@@ -105,6 +104,7 @@ static int get_delay_exec_time_from_gameid() {
         "ULJM06108", // Dies Irae ~Amantes Amentes~ JP Disc2
 
     };
+    if (gameid[0] == 0) { return 0; }
     int i;
     int n = (int)(sizeof(delays_id) / sizeof(0[delays_id]));
     for(i = 0; i < n; ++i)
@@ -120,6 +120,13 @@ int modding = 0;
 int overlaydemo_module_loader(SceModule2* m) {
     int ret = previousHandler != 0 ? previousHandler(m) : 0;
     if (m != 0) {
+#if 0
+        SceUID file = sceIoOpen("ms0:/overlaydemo.txt", PSP_O_APPEND | PSP_O_CREAT | PSP_O_WRONLY, 0777);
+        if(file >= 0) {
+            sceIoWrite(file, m->modname, strlen(m->modname) + 1);
+            sceIoClose(file);
+        }
+#endif
         if (m->text_addr & 0x80000000
                 || (m->modname[0] == 's' && m->modname[1] == 'c' && m->modname[2] == 'e')
                 || (m->modname[0] == 'o' && m->modname[1] == 'p' && m->modname[2] == 'n')) {
@@ -148,13 +155,16 @@ int thread_start(SceSize args, void *argp) {
     if((moduleLoadedTrafficLight = sceKernelCreateSema("overlaydemo_semawake", 0, 0, 1, NULL)) < 0) {
         return 1;
     }
+#if 0
+    SceUID file = sceIoOpen("ms0:/overlaydemo.txt", PSP_O_TRUNC | PSP_O_CREAT | PSP_O_WRONLY, 0777);
+    if(file >= 0) sceIoClose(file);
+#endif
     previousHandler = sctrlHENSetStartModuleHandler(&overlaydemo_module_loader);
     /* block until user module is properly loaded */
     sceKernelWaitSema(moduleLoadedTrafficLight, 1, NULL);
 
     /* load own needed libraries */
     init_modules();
-
     sceDisplayWaitVblankStart();
     while(1) {
         void *frameaddr;
